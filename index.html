@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Uber Fare Predictor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f0f0f;
+      --surface: #1a1a1a;
+      --card:    #242424;
+      --border:  #2e2e2e;
+      --green:   #00c950;
+      --text:    #f5f5f5;
+      --sub:     #888;
+      --sub2:    #444;
+    }
+
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .logo-icon {
+      width: 40px; height: 40px; background: var(--green);
+      border-radius: 10px; display: flex; align-items: center;
+      justify-content: center; font-size: 20px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: -.5px; }
+    header p  { font-size: 0.75rem; color: var(--sub); margin-top: 1px; }
+
+    /* LAYOUT */
+    .layout {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      height: calc(100vh - 69px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      padding: 24px 20px;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 18px;
+    }
+
+    .sec-label {
+      font-size: 0.65rem; font-weight: 700; color: var(--sub);
+      letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px;
+    }
+
+    /* Map hint banner */
+    .map-hint {
+      background: #0d2218;
+      border: 1px solid #1a4a2e;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: #6dffaa;
+      line-height: 1.5;
+    }
+    .map-hint span { display: block; font-weight: 600; margin-bottom: 2px; }
+
+    /* Location display rows */
+    .loc-display {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 11px; padding: 11px 14px;
+    }
+    .loc-display.active-pickup  { border-color: var(--green); }
+    .loc-display.active-dropoff { border-color: #ff4d4d; }
+    .loc-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: var(--green); }
+    .dot-red   { background: #ff4d4d; }
+    .loc-text  { font-size: 0.82rem; color: var(--sub); flex: 1; }
+    .loc-text.filled { color: var(--text); font-weight: 500; }
+    .connector-line { width: 1px; height: 12px; background: var(--border); margin-left: 17px; }
+
+    /* Reset button */
+    #btn-reset {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--sub);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.75rem;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all .2s;
+      align-self: flex-start;
+    }
+    #btn-reset:hover { border-color: #ff4d4d; color: #ff4d4d; }
+
+    /* Fields */
+    .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 0.7rem; color: var(--sub); font-weight: 500; }
+    .field input {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 11px;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 0.85rem; outline: none; transition: border-color .2s; width: 100%;
+    }
+    .field input:focus { border-color: var(--green); }
+
+    /* Stepper */
+    .stepper {
+      display: flex; align-items: center;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 9px; overflow: hidden;
+    }
+    .stepper button {
+      width: 36px; height: 38px; background: transparent;
+      border: none; color: var(--text); font-size: 1.1rem;
+      cursor: pointer; transition: background .15s;
+    }
+    .stepper button:hover { background: var(--border); }
+    .stepper span { flex: 1; text-align: center; font-size: 0.88rem; font-weight: 600; }
+
+    /* Predict btn */
+    #btn-predict {
+      width: 100%; padding: 14px;
+      background: var(--green); color: #000;
+      font-family: 'Inter', sans-serif; font-size: 0.92rem; font-weight: 800;
+      border: none; border-radius: 12px; cursor: pointer;
+      transition: background .2s, box-shadow .2s, transform .1s;
+    }
+    #btn-predict:hover { background: #00e05a; box-shadow: 0 0 20px rgba(0,201,80,.3); }
+    #btn-predict:active { transform: scale(.98); }
+    #btn-predict:disabled { background: var(--sub2); cursor: not-allowed; box-shadow: none; }
+
+    /* Error */
+    .error-msg {
+      background: #2a0f0f; border: 1px solid #5c1515;
+      border-radius: 9px; padding: 11px 13px;
+      font-size: 0.8rem; color: #ff6b6b; display: none;
+    }
+
+    /* Result card */
+    #result-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 18px; display: none;
+      animation: slideUp .4s ease;
+    }
+    @keyframes slideUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .fare-main { display: flex; align-items: baseline; gap: 5px; margin-bottom: 3px; }
+    .fare-main .currency { font-size: 1.3rem; font-weight: 700; color: var(--green); }
+    .fare-main .amount   { font-size: 2.8rem; font-weight: 900; color: var(--green); line-height: 1; }
+    .fare-range { font-size: 0.72rem; color: var(--sub); margin-bottom: 14px; }
+    .result-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .meta-item { background: var(--surface); border-radius: 9px; padding: 9px 11px; }
+    .meta-item .mlabel { font-size: 0.65rem; color: var(--sub); font-weight: 500; margin-bottom: 3px; }
+    .meta-item .mvalue { font-size: 0.88rem; font-weight: 700; }
+
+    /* MAP */
+    #map { width: 100%; height: 100%; cursor: crosshair; }
+    .leaflet-routing-container { display: none !important; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 15px; height: 15px;
+      border: 2px solid #000; border-top-color: transparent;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      vertical-align: middle; margin-right: 5px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sidebar::-webkit-scrollbar { width: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      #map { height: 320px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">🚗</div>
+  <div>
+    <h1>Uber Fare Predictor</h1>
+    <p>CatBoost ML Model &nbsp;·&nbsp; Real-time Estimation</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+
+    <!-- Hint -->
+    <div>
+      <p class="sec-label">Route</p>
+      <div class="map-hint">
+        <span>📍 How to set your route</span>
+        1st click on map → Pickup &nbsp;|&nbsp; 2nd click → Dropoff
+      </div>
+    </div>
+
+    <!-- Location display -->
+    <div>
+      <div class="loc-display" id="pickup-display">
+        <div class="loc-dot dot-green"></div>
+        <span class="loc-text" id="pickup-label">Click map to set Pickup</span>
+      </div>
+      <div class="connector-line"></div>
+      <div class="loc-display" id="dropoff-display">
+        <div class="loc-dot dot-red"></div>
+        <span class="loc-text" id="dropoff-label">Click map to set Dropoff</span>
+      </div>
+      <!-- hidden inputs for coords -->
+      <input type="hidden" id="pickup-lat"/>
+      <input type="hidden" id="pickup-lon"/>
+      <input type="hidden" id="dropoff-lat"/>
+      <input type="hidden" id="dropoff-lon"/>
+    </div>
+
+    <!-- Reset -->
+    <button id="btn-reset">✕ Reset Pins</button>
+
+    <!-- Trip details -->
+    <div>
+      <p class="sec-label">Trip Details</p>
+      <div class="fields-grid">
+        <div class="field" style="grid-column:1/-1;">
+          <label>Pickup Date &amp; Time</label>
+          <input id="trip-datetime" type="datetime-local"/>
+        </div>
+        <div class="field">
+          <label>Passengers</label>
+          <div class="stepper">
+            <button id="btn-minus">−</button>
+            <span id="pax-display">1</span>
+            <button id="btn-plus">+</button>
+          </div>
+          <input type="hidden" id="passengers" value="1"/>
+        </div>
+        <div class="field">
+          <label>Year</label>
+          <input id="year" type="number" min="2009" max="2030"/>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-msg" class="error-msg"></div>
+
+    <button id="btn-predict">🔍 &nbsp;Predict Fare</button>
+
+    <div id="result-card">
+      <p class="sec-label" style="margin-bottom:6px">Estimated Fare</p>
+      <div class="fare-main">
+        <span class="currency">$</span>
+        <span class="amount" id="res-fare">0.00</span>
+      </div>
+      <p class="fare-range" id="res-range"></p>
+      <div class="result-meta">
+        <div class="meta-item">
+          <div class="mlabel">📍 Distance</div>
+          <div class="mvalue" id="res-dist">—</div>
+        </div>
+        <div class="meta-item">
+          <div class="mlabel">⏱ Est. Time</div>
+          <div class="mvalue" id="res-time">—</div>
+        </div>
+        <div class="meta-item">
+          <div class="mlabel">🕐 Pickup Time</div>
+          <div class="mvalue" id="res-hour">—</div>
+        </div>
+        <div class="meta-item">
+          <div class="mlabel">👥 Passengers</div>
+          <div class="mvalue" id="res-pass">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+<script>
+// ── MAP INIT ──────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([40.7128, -74.006], 12);
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19
+}).addTo(map);
+
+// ── MARKERS ───────────────────────────────────────────────────────────
+function makeIcon(emoji, size = 30) {
+  return L.divIcon({
+    html: `<div style="font-size:${size}px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,.6))">${emoji}</div>`,
+    className: '', iconAnchor: [size / 2, size / 2]
+  });
+}
+const iconPickup  = makeIcon('📍', 30);
+const iconDropoff = makeIcon('🏁', 30);
+const iconCar     = makeIcon('🚗', 28);
+
+let pickupMarker = null, dropoffMarker = null, carMarker = null;
+let routingControl = null, animFrame = null;
+let clickState = 'pickup'; // 'pickup' | 'dropoff' | 'done'
+
+// ── MAP CLICK → SET PINS ──────────────────────────────────────────────
+map.on('click', function(e) {
+  const { lat, lng } = e.latlng;
+
+  if (clickState === 'pickup') {
+    if (pickupMarker) map.removeLayer(pickupMarker);
+    pickupMarker = L.marker([lat, lng], { icon: iconPickup }).addTo(map)
+      .bindPopup('<b>Pickup</b>').openPopup();
+
+    document.getElementById('pickup-lat').value = lat;
+    document.getElementById('pickup-lon').value = lng;
+    document.getElementById('pickup-label').textContent =
+      `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById('pickup-label').classList.add('filled');
+    document.getElementById('pickup-display').classList.add('active-pickup');
+
+    clickState = 'dropoff';
+
+  } else if (clickState === 'dropoff') {
+    if (dropoffMarker) map.removeLayer(dropoffMarker);
+    dropoffMarker = L.marker([lat, lng], { icon: iconDropoff }).addTo(map)
+      .bindPopup('<b>Dropoff</b>').openPopup();
+
+    document.getElementById('dropoff-lat').value = lat;
+    document.getElementById('dropoff-lon').value = lng;
+    document.getElementById('dropoff-label').textContent =
+      `🏁 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    document.getElementById('dropoff-label').classList.add('filled');
+    document.getElementById('dropoff-display').classList.add('active-dropoff');
+
+    clickState = 'done';
+  }
+});
+
+// ── RESET ─────────────────────────────────────────────────────────────
+document.getElementById('btn-reset').addEventListener('click', () => {
+  [pickupMarker, dropoffMarker, carMarker].forEach(m => { if (m) map.removeLayer(m); });
+  pickupMarker = dropoffMarker = carMarker = null;
+  if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+  if (animFrame) cancelAnimationFrame(animFrame);
+
+  ['pickup-lat','pickup-lon','dropoff-lat','dropoff-lon'].forEach(id =>
+    document.getElementById(id).value = '');
+
+  document.getElementById('pickup-label').textContent = 'Click map to set Pickup';
+  document.getElementById('dropoff-label').textContent = 'Click map to set Dropoff';
+  document.getElementById('pickup-label').classList.remove('filled');
+  document.getElementById('dropoff-label').classList.remove('filled');
+  document.getElementById('pickup-display').classList.remove('active-pickup');
+  document.getElementById('dropoff-display').classList.remove('active-dropoff');
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+
+  clickState = 'pickup';
+});
+
+// ── PASSENGER STEPPER ─────────────────────────────────────────────────
+let pax = 1;
+document.getElementById('btn-minus').addEventListener('click', () => {
+  if (pax > 1) { pax--; updatePax(); }
+});
+document.getElementById('btn-plus').addEventListener('click', () => {
+  if (pax < 6) { pax++; updatePax(); }
+});
+function updatePax() {
+  document.getElementById('pax-display').textContent = pax;
+  document.getElementById('passengers').value = pax;
+}
+
+// Default datetime & year
+const now = new Date();
+now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+document.getElementById('trip-datetime').value = now.toISOString().slice(0, 16);
+document.getElementById('year').value = now.getFullYear();
+
+// ── CAR ANIMATION ─────────────────────────────────────────────────────
+function animateCar(coords) {
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (carMarker) map.removeLayer(carMarker);
+
+  const steps = [];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const a = coords[i], b = coords[i + 1];
+    for (let j = 0; j < 40; j++) {
+      steps.push(L.latLng(
+        a.lat + (b.lat - a.lat) * j / 40,
+        a.lng + (b.lng - a.lng) * j / 40
+      ));
+    }
+  }
+  steps.push(coords[coords.length - 1]);
+
+  carMarker = L.marker(steps[0], { icon: iconCar, zIndexOffset: 999 }).addTo(map);
+  let idx = 0, last = performance.now();
+
+  function tick(ts) {
+    if (ts - last < 28) { animFrame = requestAnimationFrame(tick); return; }
+    last = ts;
+    if (idx < steps.length) { carMarker.setLatLng(steps[idx++]); animFrame = requestAnimationFrame(tick); }
+  }
+  animFrame = requestAnimationFrame(tick);
+}
+
+// ── PREDICT ───────────────────────────────────────────────────────────
+document.getElementById('btn-predict').addEventListener('click', async () => {
+  const pLat = parseFloat(document.getElementById('pickup-lat').value);
+  const pLon = parseFloat(document.getElementById('pickup-lon').value);
+  const dLat = parseFloat(document.getElementById('dropoff-lat').value);
+  const dLon = parseFloat(document.getElementById('dropoff-lon').value);
+  const pass = parseInt(document.getElementById('passengers').value);
+  const dt   = document.getElementById('trip-datetime').value;
+
+  const errEl = document.getElementById('error-msg');
+  errEl.style.display = 'none';
+
+  if ([pLat, pLon, dLat, dLon].some(isNaN)) {
+    errEl.textContent = '⚠️ Please set both Pickup and Dropoff on the map first.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!dt) {
+    errEl.textContent = '⚠️ Please select a pickup date and time.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btn-predict');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Predicting…';
+
+  try {
+    const res = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pickup_lat: pLat, pickup_lon: pLon,
+        dropoff_lat: dLat, dropoff_lon: dLon,
+        passengers: pass, datetime: dt
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Show result
+    document.getElementById('res-fare').textContent = data.fare.toFixed(2);
+    document.getElementById('res-range').textContent =
+      `Range: $${data.fare_range_low} – $${data.fare_range_high}`;
+    document.getElementById('res-dist').textContent = `${data.distance_km} km`;
+    document.getElementById('res-time').textContent = `~${data.est_minutes} min`;
+    document.getElementById('res-hour').textContent =
+      new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('res-pass').textContent = `${pass} pax`;
+    document.getElementById('result-card').style.display = 'block';
+
+    // Route + animation
+    if (routingControl) { map.removeControl(routingControl); routingControl = null; }
+    if (carMarker) map.removeLayer(carMarker);
+
+    const from = L.latLng(pLat, pLon);
+    const to   = L.latLng(dLat, dLon);
+
+    routingControl = L.Routing.control({
+      waypoints: [from, to],
+      lineOptions: {
+        styles: [{ color: '#00c950', weight: 4, opacity: 0.85 }],
+        addWaypoints: false
+      },
+      createMarker: () => null,
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      fitSelectedRoutes: true,
+      show: false
+    }).addTo(map);
+
+    routingControl.on('routesfound', e => {
+      const coords = e.routes[0].coordinates.map(c => L.latLng(c.lat, c.lng));
+      animateCar(coords);
+    });
+
+  } catch (err) {
+    errEl.textContent = '❌ ' + (err.message || 'Prediction failed.');
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔍 &nbsp;Predict Fare';
+  }
+});
+</script>
+</body>
+</html>
