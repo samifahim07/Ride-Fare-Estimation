@@ -93,3 +93,6 @@ The trained model is saved as:
 
 ```text
 final_model_cat.pkl
+
+
+![Project Dashboard](Capture.PNG)
