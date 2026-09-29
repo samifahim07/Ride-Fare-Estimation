@@ -95,4 +95,4 @@ The trained model is saved as:
 final_model_cat.pkl
 
 
-![Project Dashboard](Capture.PNG)
+![Project Dashboard](https://github.com/samifahim07/Ride-Fare-Estimation/blob/148b045037ccf1a7b10a9f44a6890a47258ce963/Capture.PNG)
