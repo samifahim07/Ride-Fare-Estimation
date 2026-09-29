@@ -132,11 +132,3 @@ Ride-Fare-Estimation/
 This project demonstrates how Machine Learning regression models can be used to estimate ride fares based on trip-related information such as location, passenger count, date, and time.
 
 The final CatBoost model achieved a Test R² score of **72.01%** and was integrated into a Flask web application for practical use.
-
-
-
-## Project Screenshot
-
-<p align="center">
-  <img src="https://github.com/samifahim07/Ride-Fare-Estimation/blob/148b045037ccf1a7b10a9f44a6890a47258ce963/Capture.PNG" width="900">
-</p>
