@@ -6,6 +6,8 @@ The project uses multiple Machine Learning regression models and selects the bes
 
 A Flask web application is also created to make predictions through a simple and interactive user interface.
 
+## Website Link : https://ube-fare-estimation.onrender.com/
+
 ## Project Features
 
 * Ride fare prediction
